@@ -1,0 +1,7 @@
+{
+    "model_name": "rf_miscon",
+    "version": "1.0.0",
+    "description": "Random Forest model for misconception prediction.",
+    "path": "/artifacts/rf_miscon.joblib",
+    "status": "active"
+}

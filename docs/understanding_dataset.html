@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>EDGE PoC – Datasets & Flow (Plain KT)</title>
+</head>
+<body bgcolor="#FFFFFF" text="#000000" link="#0000AA" vlink="#551A8B" alink="#FF0000">
+
+<h1>EDGE – Datasets, Columns, and How They Work Together</h1>
+<hr>
+
+<h2>0) What is this?</h2>
+<p>
+This page explains, in simple terms, the data used by the EDGE system:
+how each file looks, what every column means, how the pieces fit together,
+and how the data is used the first time a learner shows up and on every subsequent visit.
+It also includes a small “real-ish” example (mini dataset) and a mapping scenario for a 100-student cohort.
+</p>
+
+<hr>
+
+<h2>1) Files at a Glance (where they live)</h2>
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr><th>File</th><th>Purpose</th><th>Who uses it</th></tr>
+  <tr>
+    <td><code>artifacts/items.csv</code></td>
+    <td>Item bank (questions): topic, difficulty (<i>b</i>), discrimination (<i>a</i>), stem, distractors</td>
+    <td>IRT (Evaluate), Recommender (Exercise), Counterfactual generator (Generate)</td>
+  </tr>
+  <tr>
+    <td><code>artifacts/interactions_train.csv</code></td>
+    <td>Past learner-item interactions for training (80%)</td>
+    <td>IRT training (theta, a, b), RF misconception model, GMM (Diagnose)</td>
+  </tr>
+  <tr>
+    <td><code>artifacts/interactions_test.csv</code></td>
+    <td>Holdout interactions for validation (20%)</td>
+    <td>Validation metrics: Accuracy, Precision/Recall/F1, ECE, Brier</td>
+  </tr>
+  <tr>
+    <td><code>artifacts/irt_state.npz</code></td>
+    <td>Trained IRT parameters: learner mastery matrix <code>theta[i,t]</code>, item <code>a[j]</code>, item <code>b[j]</code>, item topics</td>
+    <td>Fast scoring of P(correct), topic mastery lookup per learner</td>
+  </tr>
+  <tr>
+    <td><code>artifacts/rf_miscon_cal.joblib</code></td>
+    <td>Calibrated Random Forest to predict misconception probability</td>
+    <td><code>POST /predict</code> for misconception_prob</td>
+  </tr>
+  <tr>
+    <td><code>artifacts/gmm_miscon.joblib</code></td>
+    <td>Bayesian GMM to cluster patterns of mistakes (misconception types)</td>
+    <td><code>POST /feedback</code> to update misconception profiles</td>
+  </tr>
+  <tr>
+    <td><code>artifacts/last_practice.npy</code></td>
+    <td>Per-learner per-topic last practice time (for retention/spacing)</td>
+    <td>Scheduler (Exercise)</td>
+  </tr>
+  <tr>
+    <td><code>artifacts/bandit_state.pkl</code> / <code>ts_state.pkl</code></td>
+    <td>Bandit state for UCB1 or Thompson Sampling (counts/values/posteriors)</td>
+    <td>Policy action selection (practice / remediate / challenge)</td>
+  </tr>
+</table>
+
+<hr>
+
+<h2>2) <code>items.csv</code> – Item Bank (Questions)</h2>
+<p>Each row is one question. Columns:</p>
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr><th>Column</th><th>Type</th><th>Meaning</th><th>Used by</th></tr>
+  <tr><td><b>item_id</b></td><td>int</td><td>Unique item identifier</td><td>All modules</td></tr>
+  <tr><td><b>topic</b></td><td>int</td><td>Topic index (e.g., 0=Math Foundations, 1=Algebra, 2=Geometry, ...)</td><td>IRT, Recommender, Retention</td></tr>
+  <tr><td><b>a</b></td><td>float</td><td>Item discrimination (slope): higher = better at separating abilities</td><td>IRT</td></tr>
+  <tr><td><b>b</b></td><td>float</td><td>Item difficulty (location): higher = harder</td><td>IRT, Recommender (match difficulty)</td></tr>
+  <tr><td><b>stem</b></td><td>str</td><td>Question text</td><td>Serving; counterfactual generation</td></tr>
+  <tr><td><b>distractors</b></td><td>str (pipe-joined)</td><td>Wrong options, e.g. <code>"A|B|C|D"</code></td><td>Serving; misconception analysis</td></tr>
+</table>
+
+<p><b>Mini sample (CSV rows):</b></p>
+<pre>
+item_id,topic,a,b,stem,distractors
+101,1,1.1,-0.2,"Factor x^2 - 5x + 6","x=1|x=3|x=6|x=2"
+102,1,0.9,0.3,"Solve 2x+3=9","x=2|x=4|x=3|x=6"
+203,2,1.2,0.0,"Area of a rectangle 3x5","8|15|10|12"
+304,3,0.8,0.7,"Derivative of x^2","x|2|2x|x^3"
+405,0,1.0,-0.5,"Simplify 6/9","2/3|3/2|1/3|3/6"
+</pre>
+
+<hr>
+
+<h2>3) <code>interactions_*.csv</code> – Learner ↔ Item Events</h2>
+<p>Each row is one learner attempt. Columns:</p>
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr><th>Column</th><th>Type</th><th>Meaning</th><th>Used by</th></tr>
+  <tr><td><b>learner_id</b></td><td>int</td><td>Which learner attempted</td><td>All modules</td></tr>
+  <tr><td><b>item_id</b></td><td>int</td><td>Which item was presented</td><td>Join with items.csv</td></tr>
+  <tr><td><b>topic</b></td><td>int</td><td>Topic of that item (redundant for convenience)</td><td>IRT, retention</td></tr>
+  <tr><td><b>a</b></td><td>float</td><td>Discrimination copied from items.csv</td><td>IRT training</td></tr>
+  <tr><td><b>b</b></td><td>float</td><td>Difficulty copied from items.csv</td><td>IRT training</td></tr>
+  <tr><td><b>response_time</b></td><td>float (sec)</td><td>How long they took</td><td>RF features; GMM features</td></tr>
+  <tr><td><b>attempts</b></td><td>int</td><td>Retries within the item</td><td>RF; GMM</td></tr>
+  <tr><td><b>hints</b></td><td>int</td><td>Hints used</td><td>RF; GMM</td></tr>
+  <tr><td><b>correct</b></td><td>0/1</td><td>Outcome</td><td>IRT label; RF label; GMM subset (wrong only)</td></tr>
+  <tr><td><b>misconception</b></td><td>0/1</td><td>Observed misconception flag (sim.)</td><td>RF label (or target proxy)</td></tr>
+  <tr><td><b>time_of_day</b></td><td>str</td><td>morning/afternoon/evening</td><td>RF feature</td></tr>
+  <tr><td><b>device_type</b></td><td>str</td><td>desktop/tablet/phone</td><td>RF feature</td></tr>
+  <tr><td><b>text_quality</b></td><td>float 0..1</td><td>Answer/explanation quality (sim.)</td><td>RF feature</td></tr>
+  <tr><td><b>fatigue_factor</b></td><td>int</td><td>Fatigue proxy (sim.)</td><td>RF feature</td></tr>
+  <tr><td><b>chosen_distractor</b></td><td>int</td><td>Index of chosen wrong option if incorrect, else -1</td><td>GMM, misconception type analysis</td></tr>
+</table>
+
+<p><b>Mini sample (CSV rows):</b></p>
+<pre>
+learner_id,item_id,topic,a,b,response_time,attempts,hints,correct,misconception,time_of_day,device_type,text_quality,fatigue_factor,chosen_distractor
+17,101,1,1.1,-0.2,42.3,1,0,1,0,evening,phone,0.62,3,-1
+17,304,3,0.8,0.7,58.8,2,1,0,1,evening,phone,0.55,3,1
+17,102,1,0.9,0.3,29.0,1,0,1,0,morning,desktop,0.71,2,-1
+52,203,2,1.2,0.0,21.4,1,0,1,0,afternoon,tablet,0.80,1,-1
+52,304,3,0.8,0.7,66.2,2,0,0,1,afternoon,tablet,0.48,2,2
+</pre>
+
+<hr>
+
+<h2>4) Column Cross-Walk (who uses what)</h2>
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr><th>Column</th><th>Evaluate (IRT)</th><th>Diagnose (GMM/RF)</th><th>Generate</th><th>Exercise (Policy)</th></tr>
+  <tr><td><b>topic</b></td><td>Mastery per topic</td><td>Profile grouping</td><td>Condition prompts</td><td>Retention spacing</td></tr>
+  <tr><td><b>a, b</b></td><td>Train 2PL</td><td>(features optional)</td><td>Pick near-difficulty</td><td>Pick mid difficulty</td></tr>
+  <tr><td><b>correct</b></td><td>Label for IRT</td><td>Label/target for RF</td><td>Choose CF difficulty</td><td>Reward shaping</td></tr>
+  <tr><td><b>response_time</b></td><td>—</td><td>RF/GMM feature</td><td>CF guardrails</td><td>Time penalty</td></tr>
+  <tr><td><b>attempts, hints</b></td><td>—</td><td>RF/GMM feature</td><td>CF instruction</td><td>Priority inputs</td></tr>
+  <tr><td><b>time_of_day, device_type</b></td><td>—</td><td>RF features</td><td>—</td><td>—</td></tr>
+  <tr><td><b>chosen_distractor</b></td><td>—</td><td>GMM clustering</td><td>Steer CF options</td><td>—</td></tr>
+</table>
+
+<hr>
+
+<h2>5) First-Time vs Every-Time (Lifecycle)</h2>
+
+<h3>First-time learner (cold start)</h3>
+<ol>
+  <li>Learner shows up (no history). System assigns default mastery (theta) per topic (usually ~0) or runs a short placement test.</li>
+  <li>Recommender selects medium-easy items in several topics to probe ability. Responses go to <code>interactions_train.csv</code> (future training) and live memory.</li>
+  <li>IRT updates mastery <code>theta[i,t]</code> from observed correctness; RF trains on pooled interactions (offline) to learn misconception signals; GMM fits on wrong attempts to discover misconception types.</li>
+  <li>Policy (bandit) starts near-uniform and learns from reward (e.g., +Δmastery, misconception↓, −time penalty).</li>
+</ol>
+
+<h3>Every subsequent session</h3>
+<ol>
+  <li>We load saved state: <code>irt_state.npz</code>, RF, GMM, bandit state, and <code>last_practice.npy</code>.</li>
+  <li><b>Predict</b> (<code>POST /predict</code>): compute misconception probability from RF features; pick action (practice/remediate/challenge).</li>
+  <li><b>Recommend</b> (<code>POST /recommend</code>): rank topics by priority = low mastery + high forgetting + misconception penalty; choose items with matching difficulty.</li>
+  <li><b>Feedback</b> (<code>POST /feedback</code>): log result, update retention timestamp, update misconception profile (via GMM), compute reward and update bandit.</li>
+  <li>Repeat; metrics available via <code>GET /metrics</code>; calibration via <code>edge/validate.py</code>.</li>
+</ol>
+
+<hr>
+
+<h2>6) Real Mapping Scenario (100 students, real-ish subjects)</h2>
+
+<h3>Subjects & Topic IDs</h3>
+<pre>
+0=Math Foundations, 1=Algebra, 2=Geometry, 3=Calculus, 4=Statistics,
+5=Physics Kinematics, 6=Chemistry Stoichiometry, 7=Biology Genetics,
+8=English Grammar, 9=Reading Comprehension, (… up to 19 in PoC)
+</pre>
+
+<h3>Distractors (how they matter)</h3>
+<ul>
+  <li>Each item has 4 options in <code>distractors</code>. The correct answer is implied by the item content (PoC may store externally).</li>
+  <li>When incorrect, <code>chosen_distractor</code> records which wrong option was picked (0..3). Consistent patterns across many learners in the same topic = a potential misconception cluster.</li>
+</ul>
+
+<h3>100-student cohort setup (example)</h3>
+<ul>
+  <li><b>Learners:</b> 100 students, IDs 0..99. Each has noisy initial mastery across topics (theta).</li>
+  <li><b>Items:</b> ~800 items distributed across 20 topics, each with <i>a</i> and <i>b</i> drawn realistically (a ≈ 0.6..1.4; b ≈ −1.0..+1.0).</li>
+  <li><b>Sessions:</b> Each student attempts a random sample of items over several days. Time-of-day and device vary.</li>
+</ul>
+
+<h3>Concrete walk-through (Student #17 “Asha”)</h3>
+<ol>
+  <li>Asha starts with Algebra mastery near 0.2 (low). The system recommends item 102 (<code>b=0.3</code>, moderate). She answers correctly after 29s, no hints: Algebra mastery nudges up (theta[17,Algebra] ↑).</li>
+  <li>Recommender tries Calculus item 304 (<code>b=0.7</code>, harder). Asha answers incorrectly after 59s, uses 1 hint, picks distractor #1. GMM assigns high responsibility to cluster “confuses derivative with slope of secant”. Misconception profile for Calculus increases.</li>
+  <li>Policy sets action to <b>remediate</b>. The generator picks a counterfactual Calculus item targeting that misconception (e.g., explicit tangent vs. secant contrast). Next time Asha improves; reward credits the remediate action.</li>
+  <li>Spacing: <code>last_practice[17, topic]</code> updates each time; topics not seen for a while get lower retention → higher priority.</li>
+</ol>
+
+<hr>
+
+<h2>7) Small Mini-Dataset (5 items × 3 students × 8 interactions)</h2>
+
+<h3>A) items.csv (excerpt)</h3>
+<pre>
+item_id,topic,a,b,stem,distractors
+11,1,1.0,0.0,"Solve 3x=12","x=3|x=4|x=6|x=9"
+12,1,1.2,0.5,"Solve x^2=9","x=±3|x=3|x=9|x=±9"
+21,2,0.9,-0.3,"Area of 4x7","21|28|18|11"
+31,3,0.8,0.7,"Derivative of x^3","3x^2|x^2|x^3|3x"
+41,0,1.1,-0.6,"Simplify 8/12","2/3|3/2|1/3|3/8"
+</pre>
+
+<h3>B) interactions_train.csv (excerpt)</h3>
+<pre>
+learner_id,item_id,topic,a,b,response_time,attempts,hints,correct,misconception,time_of_day,device_type,text_quality,fatigue_factor,chosen_distractor
+7,11,1,1.0,0.0,24.1,1,0,1,0,morning,desktop,0.70,2,-1
+7,31,3,0.8,0.7,61.0,2,1,0,1,evening,phone,0.52,3,2
+18,21,2,0.9,-0.3,30.5,1,0,1,0,afternoon,tablet,0.77,1,-1
+18,41,0,1.1,-0.6,19.2,1,0,1,0,afternoon,tablet,0.80,1,-1
+55,31,3,0.8,0.7,70.3,2,1,0,1,evening,desktop,0.49,2,1
+55,12,1,1.2,0.5,33.4,1,0,1,0,morning,desktop,0.68,2,-1
+7,12,1,1.2,0.5,28.7,1,0,1,0,evening,phone,0.63,3,-1
+55,21,2,0.9,-0.3,22.9,1,0,1,0,afternoon,desktop,0.75,1,-1
+</pre>
+
+<h3>C) How features map during prediction</h3>
+<ul>
+  <li>RF features: prior_mastery (from theta or baseline), response_time, attempts, hints, text_quality, fatigue_factor, time_of_day, device_type</li>
+  <li>Label (during training): misconception (0/1) or a proxy</li>
+  <li>GMM uses wrong attempts with features like response_time, log(time), hints, attempts to produce misconception responsibilities (soft cluster membership)</li>
+</ul>
+
+<hr>
+
+<h2>8) Frequently Asked: “Where does mastery come from?”</h2>
+<ul>
+  <li><b>Placement test:</b> short test on entry; fit theta via IRT from those items.</li>
+  <li><b>Cold default:</b> set all topics to a small prior (e.g., 0) and update quickly with early answers.</li>
+  <li><b>External test import:</b> convert external test scores to per-topic mastery and load into theta.</li>
+</ul>
+
+<hr>
+
+<h2>9) End-to-End Flow (One page summary)</h2>
+<ol>
+  <li><b>Item bank</b> defines topics + (a,b), stems and distractors.</li>
+  <li><b>Interactions</b> accumulate (correct, time, hints, attempts, chosen_distractor, context).</li>
+  <li><b>Evaluate (IRT):</b> learn theta (mastery per topic) and keep item parameters stable.</li>
+  <li><b>Diagnose:</b> RF predicts misconception probability; GMM clusters error patterns.</li>
+  <li><b>Generate:</b> heuristic or LLM-assisted counterfactuals targeting misconception types.</li>
+  <li><b>Exercise:</b> priority index + bandit choose next action; retention decay boosts forgotten topics.</li>
+  <li><b>Persist:</b> all states saved under <code>artifacts/</code>; reload next session.</li>
+</ol>
+
+<hr>
+
+<h2>10) What to look at when “it doesn’t feel real”</h2>
+<ul>
+  <li>Distractors: make sure wrong options reflect real confusions (e.g., inverse vs reciprocal, tangent vs secant).</li>
+  <li>Response times: longer on hard items; shorter on easy ones; fatigue increases time.</li>
+  <li>Attempts & hints: correlate with difficulty and misconceptions.</li>
+  <li>Chosen distractor: repeated patterns across many learners in a topic indicate genuine misconception clusters.</li>
+</ul>
+
+<hr>
+
+
+</body>
+</html>

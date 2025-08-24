@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDGE System API Documentation</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        h1 { color: #1e90ff; }
+        h2 { color: #333; }
+        h3 { color: #666; }
+        pre { background-color: #f4f4f4; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
+        .api-call { margin-bottom: 20px; }
+        .response { margin-top: 10px; background-color: #f4f4f4; padding: 10px; border-radius: 5px; }
+        .request { margin-top: 10px; background-color: #e8e8e8; padding: 10px; border-radius: 5px; }
+        .endpoint-title { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>EDGE System API Documentation</h1>
+    <p>This document provides an overview of the various API endpoints available in the EDGE system, detailing the usage and functionality of each endpoint.</p>
+
+    <!-- Health Check API -->
+    <div class="api-call">
+        <h2>1. Health Check API</h2>
+        <p><span class="endpoint-title">Endpoint:</span> <strong>GET /health</strong></p>
+        <p><span class="endpoint-title">Description:</span> Verifies if the system is running properly.</p>
+        <h3>Request</h3>
+        <pre>GET /health</pre>
+        <div class="response">
+            <h3>Response</h3>
+            <pre>{ "status": "ok" }</pre>
+        </div>
+    </div>
+
+    <!-- Predict API -->
+    <div class="api-call">
+        <h2>2. Predict API</h2>
+        <p><span class="endpoint-title">Endpoint:</span> <strong>POST /predict</strong></p>
+        <p><span class="endpoint-title">Description:</span> Predicts the misconception probability and selects a bandit action based on the learner’s profile.</p>
+        <h3>Request</h3>
+        <pre>
+{
+    "learner_id": 42,
+    "item_id": 128,
+    "prior_mastery": 0.8,
+    "response_time": 35.5,
+    "attempts": 1,
+    "hints": 0,
+    "correct": 0,
+    "fatigue_factor": 2,
+    "text_quality": 0.75,
+    "time_of_day": "morning",
+    "device_type": "desktop"
+}
+        </pre>
+        <div class="response">
+            <h3>Response</h3>
+            <pre>{ "misconception_prob": 0.35, "bandit_action": "remediate" }</pre>
+        </div>
+    </div>
+
+    <!-- Recommend API -->
+    <div class="api-call">
+        <h2>3. Recommend API</h2>
+        <p><span class="endpoint-title">Endpoint:</span> <strong>POST /recommend</strong></p>
+        <p><span class="endpoint-title">Description:</span> Recommends the next set of items (questions) for a learner based on their current profile and progress.</p>
+        <h3>Request</h3>
+        <pre>
+{
+    "learner_id": 42,
+    "n": 5
+}
+        </pre>
+        <div class="response">
+            <h3>Response</h3>
+            <pre>{ "learner_id": 42, "recommended_items": [101, 102, 103, 104, 105] }</pre>
+        </div>
+    </div>
+
+    <!-- Feedback API -->
+    <div class="api-call">
+        <h2>4. Feedback API</h2>
+        <p><span class="endpoint-title">Endpoint:</span> <strong>POST /feedback</strong></p>
+        <p><span class="endpoint-title">Description:</span> Receives feedback on a learner's performance and updates their profile with new information. Adjusts their misconception and mastery.</p>
+        <h3>Request</h3>
+        <pre>
+{
+    "learner_id": 42,
+    "item_id": 128,
+    "correct": 0,
+    "response_time": 45.5,
+    "attempts": 2,
+    "hints": 1
+}
+        </pre>
+        <div class="response">
+            <h3>Response</h3>
+            <pre>{ "status": "recorded", "time_step": 5, "reward": 0.25 }</pre>
+        </div>
+    </div>
+
+    <!-- Update Reward API -->
+    <div class="api-call">
+        <h2>5. Update Reward API</h2>
+        <p><span class="endpoint-title">Endpoint:</span> <strong>POST /updateReward</strong></p>
+        <p><span class="endpoint-title">Description:</span> Updates the reward signal for the bandit algorithm based on the learner’s actions and performance.</p>
+        <h3>Request</h3>
+        <pre>
+{
+    "action": 1,
+    "reward": 0.35
+}
+        </pre>
+        <div class="response">
+            <h3>Response</h3>
+            <pre>{ "status": "ok" }</pre>
+        </div>
+    </div>
+
+    <!-- Counterfactual Generation API -->
+    <div class="api-call">
+        <h2>6. Counterfactual Generation API</h2>
+        <p><span class="endpoint-title">Endpoint:</span> <strong>POST /counterfactual</strong></p>
+        <p><span class="endpoint-title">Description:</span> Generates a counterfactual item based on a given item and a misconception label to remediate a learner's misunderstanding.</p>
+        <h3>Request</h3>
+        <pre>
+{
+    "item_id": 128,
+    "misconception": 2
+}
+        </pre>
+        <div class="response">
+            <h3>Response</h3>
+            <pre>
+{
+    "counterfactual": {
+        "stem": "What is the derivative of the quadratic equation?",
+        "options": ["A. 2x", "B. x^2", "C. 4x", "D. x"],
+        "correct_index": 0
+    }
+}
+            </pre>
+        </div>
+    </div>
+
+    <!-- Metrics API -->
+    <div class="api-call">
+        <h2>7. Metrics API</h2>
+        <p><span class="endpoint-title">Endpoint:</span> <strong>GET /metrics</strong></p>
+        <p><span class="endpoint-title">Description:</span> Provides metrics related to the bandit model and its state, useful for monitoring and debugging.</p>
+        <h3>Request</h3>
+        <pre>GET /metrics</pre>
+        <div class="response">
+            <h3>Response</h3>
+            <pre>
+{
+    "bandit_kind": "UCB",
+    "bandit_state": {
+        "counts_values": [5, 4, 6],
+        "alpha": [0.7, 0.8, 0.9],
+        "beta": [1.0, 1.1, 1.2]
+    }
+}
+            </pre>
+        </div>
+    </div>
+
+    <h2>High-Level Design (HLD)</h2>
+    <p>The EDGE system is designed to personalize the learner's educational experience using **Item Response Theory (IRT)**, **Bandit Algorithms**, and **Machine Learning Models**. Below is a diagram of the system's architecture:</p>
+
+    <h3>Components</h3>
+    <ul>
+        <li><strong>Learner Profile:</strong> Tracks learner's **performance** and **misconceptions** over time.</li>
+        <li><strong>Item Bank:</strong> Contains **questions/items** with **difficulty** and **discrimination** values.</li>
+        <li><strong>Bandit Model:</strong> Uses **UCB** or **Thompson Sampling** to decide whether to **remediate**, **challenge**, or **practice**.</li>
+        <li><strong>Prediction Engine:</strong> Predicts a learner's **misconception probability** and **mastery** using IRT and Random Forests.</li>
+    </ul>
+
+    <h3>Data Flow</h3>
+    <p>The data flow involves the following steps:</p>
+    <ol>
+        <li>The learner interacts with an item.</li>
+        <li>The system records performance, including **correctness**, **response time**, and **misconceptions**.</li>
+        <li>After feedback, the system **adjusts mastery** and predicts next actions (e.g., **remediate** or **challenge**).</li>
+        <li>The bandit algorithm updates its policy based on learner feedback.</li>
+    </ol>
+    
+    <p>End users can view **metrics** for debugging and analysis.</p>
+</body>
+</html>
+

@@ -1,0 +1,93 @@
+{
+  "known": [1, 2, 7, 12, 34, 55, 88, 99, 101, 150, 200, 210],
+  "learners": {
+    "1": {
+      "name": "anon-1",
+      "enrolled_topics": [0, 1, 2],
+      "created_at": "2025-07-01T10:00:00Z",
+      "last_active": "2025-08-20T15:12:11Z",
+      "avg_mastery": 0.15,
+      "sessions": 4
+    },
+    "7": {
+      "name": "anon-7",
+      "enrolled_topics": [2, 3],
+      "created_at": "2025-07-02T09:30:00Z",
+      "last_active": "2025-08-22T08:44:33Z",
+      "avg_mastery": 0.28,
+      "sessions": 7
+    },
+    "12": {
+      "name": "anon-12",
+      "enrolled_topics": [3, 4, 5],
+      "created_at": "2025-07-05T12:00:00Z",
+      "last_active": "2025-08-24T09:12:05Z",
+      "avg_mastery": 0.63,
+      "sessions": 12
+    },
+    "34": {
+      "name": "anon-34",
+      "enrolled_topics": [7],
+      "created_at": "2025-07-10T14:10:00Z",
+      "last_active": "2025-08-22T14:03:09Z",
+      "avg_mastery": 0.68,
+      "sessions": 3
+    },
+    "55": {
+      "name": "anon-55",
+      "enrolled_topics": [10],
+      "created_at": "2025-07-12T18:22:00Z",
+      "last_active": "2025-08-23T12:38:10Z",
+      "avg_mastery": 0.55,
+      "sessions": 8
+    },
+    "88": {
+      "name": "anon-88",
+      "enrolled_topics": [1],
+      "created_at": "2025-07-15T07:45:00Z",
+      "last_active": "2025-08-23T07:52:10Z",
+      "avg_mastery": 0.63,
+      "sessions": 5
+    },
+    "99": {
+      "name": "anon-99",
+      "enrolled_topics": [4],
+      "created_at": "2025-07-18T16:05:00Z",
+      "last_active": "2025-08-22T16:05:00Z",
+      "avg_mastery": 0.15,
+      "sessions": 2
+    },
+    "101": {
+      "name": "anon-101",
+      "enrolled_topics": [5],
+      "created_at": "2025-07-20T09:22:00Z",
+      "last_active": "2025-08-24T09:28:54Z",
+      "avg_mastery": 0.73,
+      "sessions": 9
+    },
+    "150": {
+      "name": "anon-150",
+      "enrolled_topics": [12],
+      "created_at": "2025-07-25T11:00:00Z",
+      "last_active": "2025-08-23T11:06:10Z",
+      "avg_mastery": 0.22,
+      "sessions": 6
+    },
+    "200": {
+      "name": "anon-200",
+      "enrolled_topics": [15],
+      "created_at": "2025-07-28T08:00:00Z",
+      "last_active": "2025-08-23T08:00:00Z",
+      "avg_mastery": 0.62,
+      "sessions": 3
+    },
+    "210": {
+      "name": "anon-210",
+      "enrolled_topics": [17],
+      "created_at": "2025-07-30T13:12:00Z",
+      "last_active": "2025-08-24T13:12:00Z",
+      "avg_mastery": 0.78,
+      "sessions": 4
+    }
+  }
+}
